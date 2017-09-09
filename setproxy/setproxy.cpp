@@ -44,8 +44,10 @@ void LogString(const char *lpsz, ...)
 
 void NotifyProxyChanged()
 {
+	//To alert all available WinInet instances, set the Buffer parameter of InternetSetOption to NULL and BufferLength to 0 when passing this option
 	InternetSetOption(NULL, INTERNET_OPTION_PROXY_SETTINGS_CHANGED, NULL, 0);
 }
+
 BOOL ConfigureProxy(SETPROXY_ACTION action)
 {
 	INTERNET_PER_CONN_OPTION_LIST    List;
@@ -65,13 +67,14 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 	List.pOptions = Option;
 
 	Option[0].dwOption = INTERNET_PER_CONN_AUTODISCOVERY_FLAGS;
-
+	LogString("Calling InternetQueryOption with NULL handle and option INTERNET_OPTION_PER_CONNECTION_OPTION");
 	if (FALSE != InternetQueryOption(
 		NULL,
 		INTERNET_OPTION_PER_CONNECTION_OPTION,
 		&List,
 		&cbList))
 	{
+		LogString("InternetQueryOption succeeded");
 		Option[1].dwOption = INTERNET_PER_CONN_FLAGS;
 
 		/*
@@ -195,7 +198,11 @@ INT Usage()
 	printf("manual http=HOST:PORT[;ftp=HOST:PORT]  --  (configure server)\n");
 	printf("manual http=http://proxy:80;https=https://proxy:80\n");
 	printf("bypass \"172.*;157.*;10.*;127.*;<local>\"\n");
-	return 0;
+	printf("\nReferences\n**********\n");
+	printf("Setting and Retrieving Internet Options https://msdn.microsoft.com/en-us/library/aa385384(v=vs.85).aspx\n");
+	printf("How to programmatically query and set proxy settings under Internet Explorer https://support.microsoft.com/en-us/help/226473/how-to-programmatically-query-and-set-proxy-settings-under-internet-ex\n");
+	printf("InternetQueryOption function https://msdn.microsoft.com/en-us/library/aa385101(v=vs.85).aspx\n");
+	return 0; 
 }
 
 
@@ -226,6 +233,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 			// Adding the Action before if (argc >2) statement since user might specify blank as the autoconfig 
 			// Incase user specifies blank in Inetcpl.cpl then the connection is returned to Direct. We are simulating this behaviour			
 			action = AUTOCONFIG;
+			LogString("Setting AutoConfig url");
 			if (argc >2)
 			{
 				pszBuffer = argv[2];
@@ -239,6 +247,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 		else if (0 == _strnicmp("auto", argv[1], 4))
 		{
 			action = AUTO;
+			LogString("Setting Auto detect proxy settings.");
 		}
 		else if (0 == _strnicmp("manual", argv[1], 6))
 		{
@@ -246,18 +255,21 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 			if (argc >2)
 			{
 				action = MANUALSERVER;
+				LogString("Setting Hardcoded proxy");
 				pszBuffer = argv[2];
 			}
 		}
 		else if (0 == _strnicmp("direct", argv[1], 6))
 		{
 			action = DIRECT;
+			LogString("Setting Direct Internet Access, proxy disabled.");
 		}
 		else if (0 == _strnicmp("bypass", argv[1], 6))
 		{
 			if (argc >2)
 			{
 				action = BYPASS;
+				LogString("Setting the Proxy Bypass addresses");
 				pszBuffer = argv[2];
 			}
 		}
