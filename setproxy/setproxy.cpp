@@ -45,6 +45,7 @@ void LogString(const char *lpsz, ...)
 void NotifyProxyChanged()
 {
 	//To alert all available WinInet instances, set the Buffer parameter of InternetSetOption to NULL and BufferLength to 0 when passing this option
+	LogString("Calling InternetSetOption with NULL handle and option INTERNET_OPTION_PROXY_SETTINGS_CHANGED");
 	InternetSetOption(NULL, INTERNET_OPTION_PROXY_SETTINGS_CHANGED, NULL, 0);
 }
 
@@ -67,7 +68,7 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 	List.pOptions = Option;
 
 	Option[0].dwOption = INTERNET_PER_CONN_AUTODISCOVERY_FLAGS;
-	LogString("Calling InternetQueryOption with NULL handle and option INTERNET_OPTION_PER_CONNECTION_OPTION");
+	LogString("Calling InternetQueryOption with NULL handle and option INTERNET_OPTION_PER_CONNECTION_OPTION/INTERNET_PER_CONN_AUTODISCOVERY_FLAGS");
 	if (FALSE != InternetQueryOption(
 		NULL,
 		INTERNET_OPTION_PER_CONNECTION_OPTION,
@@ -97,23 +98,27 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 		*/
 
 		Option[1].Value.dwValue = PROXY_TYPE_DIRECT;
-
+		LogString("Option:INTERNET_PER_CONN_FLAGS Value:PROXY_TYPE_DIRECT");
 		if (AUTO == action)
 		{
 			Option[1].Value.dwValue |= PROXY_TYPE_AUTO_DETECT;
+			LogString("Option:INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_AUTO_DETECT");
 			Option[0].Value.dwValue |= AUTO_PROXY_FLAG_USER_SET;
+			LogString("Option:INTERNET_PER_CONN_AUTODISCOVERY_FLAGS Value |= AUTO_PROXY_FLAG_USER_SET");
 		}
 		else
 		{
 			Option[0].Value.dwValue &= ~AUTO_PROXY_FLAG_DETECTION_RUN;
-
+			LogString("Option:INTERNET_PER_CONN_AUTODISCOVERY_FLAGS Value &= ~AUTO_PROXY_FLAG_DETECTION_RUN");
 			if (MANUAL == action)
 			{
 				Option[1].Value.dwValue |= PROXY_TYPE_PROXY;
+				LogString("Option:INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_PROXY");
 			}
 			else if (AUTOCONFIG == action)
 			{
 				Option[1].Value.dwValue |= PROXY_TYPE_AUTO_PROXY_URL;
+				LogString("Option:INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_AUTO_PROXY_URL");
 			}
 			// nothing left to do for DIRECT case
 		}
@@ -123,6 +128,8 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 		List.dwOptionCount = 2;
 		List.dwOptionError = 0;
 		List.pOptions = Option;
+
+		LogString("Calling InternetSetOption with NULL handle and option INTERNET_OPTION_PER_CONNECTION_OPTION");
 
 		if (InternetSetOption(NULL, INTERNET_OPTION_PER_CONNECTION_OPTION, &List, cbList))
 		{
@@ -161,6 +168,7 @@ BOOL SetProxyOption(__in_opt INT iProxyOption, __in_opt char * pszValue)
 	List.dwOptionError = 0;
 	List.pOptions = Option;
 
+	LogString("Calling InternetSetOption with NULL handle and option INTERNET_OPTION_PER_CONNECTION_OPTION with option %d/%X value : %s", iProxyOption, iProxyOption, pszValue);
 	if (InternetSetOption(NULL, INTERNET_OPTION_PER_CONNECTION_OPTION, &List, nSize))
 	{
 		NotifyProxyChanged();
@@ -200,7 +208,7 @@ INT Usage()
 	printf("bypass \"172.*;157.*;10.*;127.*;<local>\"\n");
 	printf("\nReferences\n**********\n");
 	printf("Setting and Retrieving Internet Options https://msdn.microsoft.com/en-us/library/aa385384(v=vs.85).aspx\n");
-	printf("How to programmatically query and set proxy settings under Internet Explorer https://support.microsoft.com/en-us/help/226473/how-to-programmatically-query-and-set-proxy-settings-under-internet-ex\n");
+	printf("How to programmatically query and set proxy settings under WinINet https://support.microsoft.com/en-us/help/226473/how-to-programmatically-query-and-set-proxy-settings-under-internet-ex\n");
 	printf("InternetQueryOption function https://msdn.microsoft.com/en-us/library/aa385101(v=vs.85).aspx\n");
 	return 0; 
 }
@@ -281,7 +289,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 	case AUTO:
 		if (TRUE == ConfigureProxy(AUTO))
 		{
-			LogString("Successfully configured Interenet Explorer to use the Automatic Proxy detection.");
+			LogString("Successfully configured WinINet to use the Automatic Proxy detection.");
 			iReturn = 0;
 		}
 		else
@@ -292,7 +300,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 	case MANUAL:
 		if (TRUE == ConfigureProxy(MANUAL))
 		{
-			LogString("Successfully configured Internet Explorer to use Manual Proxy settings.");
+			LogString("Successfully configured WinINet to use Manual Proxy settings.");
 			iReturn = 0;
 		}
 		else
@@ -306,7 +314,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 		{
 			if (TRUE == SetProxyServer(pszBuffer))
 			{
-				LogString("Successfully configured Internet Explorer Manual Proxy server to %s.", pszBuffer);
+				LogString("Successfully configured WinINet Manual Proxy server to %s.", pszBuffer);
 				iReturn = 0;
 			}
 			else
@@ -322,7 +330,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 	case DIRECT:
 		if (TRUE == ConfigureProxy(DIRECT))
 		{
-			LogString("Successfully configured Internet Explorer to use Direct Internet access. The Proxy setting have been turned off.");
+			LogString("Successfully configured WinINet to use Direct Internet access. The Proxy setting have been turned off.");
 			iReturn = 0;
 		}
 		else
@@ -333,7 +341,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 	case BYPASS:
 		if (TRUE == SetProxyByPass(pszBuffer))
 		{
-			LogString("Successfully configured Internet Explorer Proxy ByPass settings to %s.", pszBuffer);
+			LogString("Successfully configured WinINet Proxy ByPass settings to %s.", pszBuffer);
 			iReturn = 0;
 		}
 		else
@@ -347,7 +355,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 
 			if (TRUE == SetProxyAutoConfig(pszBuffer))
 			{
-				LogString("Successfully configured Internet Explorer AutoconfigURL to %s.", pszBuffer);
+				LogString("Successfully configured WinINet AutoconfigURL to %s.", pszBuffer);
 				iReturn = 0;
 			}
 			else
