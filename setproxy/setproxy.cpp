@@ -49,6 +49,140 @@ void NotifyProxyChanged()
 	InternetSetOption(NULL, INTERNET_OPTION_PROXY_SETTINGS_CHANGED, NULL, 0);
 }
 
+
+/*
+#define INTERNET_PER_CONN_FLAGS                         1
+#define INTERNET_PER_CONN_PROXY_SERVER                  2
+#define INTERNET_PER_CONN_PROXY_BYPASS                  3
+#define INTERNET_PER_CONN_AUTOCONFIG_URL                4
+#define INTERNET_PER_CONN_AUTODISCOVERY_FLAGS           5
+#define INTERNET_PER_CONN_AUTOCONFIG_SECONDARY_URL      6
+#define INTERNET_PER_CONN_AUTOCONFIG_RELOAD_DELAY_MINS  7
+#define INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_TIME   8
+#define INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_URL    9
+#define INTERNET_PER_CONN_FLAGS_UI                      10
+*/
+
+void DumpPerConnOption(INTERNET_PER_CONN_OPTION &Option)
+{
+	switch (Option.dwOption)
+	{
+	case INTERNET_PER_CONN_FLAGS: //1
+		printf("INTERNET_PER_CONN_AUTOCONFIG_URL (1)\n");
+		/*Sets or retrieves the connection type. The Value member will contain one or more of the following values: 
+			PROXY_TYPE_DIRECT
+			The connection does not use a proxy server. 
+			PROXY_TYPE_PROXY
+			The connection uses an explicitly set proxy server. 
+			PROXY_TYPE_AUTO_PROXY_URL
+			The connection downloads and processes an automatic configuration script at a specified URL. 
+			PROXY_TYPE_AUTO_DETECT
+			The connection automatically detects settings. 
+			//
+			// PER_CONN_FLAGS
+			//
+			#define PROXY_TYPE_DIRECT                               0x00000001   // direct to net
+			#define PROXY_TYPE_PROXY                                0x00000002   // via named proxy
+			#define PROXY_TYPE_AUTO_PROXY_URL                       0x00000004   // autoproxy URL
+			#define PROXY_TYPE_AUTO_DETECT                          0x00000008   // use autoproxy detection
+		*/
+		switch (Option.Value.dwValue)
+		{
+		case PROXY_TYPE_DIRECT:
+			printf("PROXY_TYPE_DIRECT (1). The connection does not use a proxy server.\n");
+			break;
+		case PROXY_TYPE_PROXY:
+			printf("PROXY_TYPE_PROXY (2). The connection uses an explicitly set proxy server.\n");
+			break;
+		case PROXY_TYPE_AUTO_PROXY_URL:
+			printf("PROXY_TYPE_AUTO_PROXY_URL (4). The connection downloads and processes an automatic configuration script at a specified URL.\n");
+			break;
+		case PROXY_TYPE_AUTO_DETECT:
+			printf("PROXY_TYPE_AUTO_DETECT(8). The connection automatically detects settings.\n");
+			break;
+		default:
+			break;
+		}
+		break;
+
+	case INTERNET_PER_CONN_PROXY_SERVER: //2
+		printf("INTERNET_PER_CONN_PROXY_SERVER (2)\n");
+		if (Option.Value.pszValue != NULL)
+			GlobalFree(Option.Value.pszValue);
+		break;
+	case INTERNET_PER_CONN_PROXY_BYPASS:  //3
+		printf("INTERNET_PER_CONN_PROXY_BYPASS (3)\n");
+		if (Option.Value.pszValue != NULL)
+			GlobalFree(Option.Value.pszValue);
+		break;
+	case INTERNET_PER_CONN_AUTOCONFIG_URL: //4
+		printf("INTERNET_PER_CONN_AUTOCONFIG_URL (4)\n");
+		if (Option.Value.pszValue != NULL)
+			GlobalFree(Option.Value.pszValue);
+		break;
+	case INTERNET_PER_CONN_AUTODISCOVERY_FLAGS: //5
+		printf("INTERNET_PER_CONN_AUTODISCOVERY_FLAGS (5)\n");
+		break;
+	case INTERNET_PER_CONN_AUTOCONFIG_SECONDARY_URL: //6
+		printf("INTERNET_PER_CONN_AUTOCONFIG_SECONDARY_URL (6)\n");
+		break;
+	case INTERNET_PER_CONN_AUTOCONFIG_RELOAD_DELAY_MINS: //7
+		printf("INTERNET_PER_CONN_AUTOCONFIG_RELOAD_DELAY_MINS (7)\n");
+		break;
+	case INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_TIME: //8
+		printf("INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_TIME (8)\n");
+		break;
+	case INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_URL: //9
+		printf("INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_URL (9)\n");
+		break;
+	case INTERNET_PER_CONN_FLAGS_UI: //10
+		printf("INTERNET_PER_CONN_AUTOCONFIG_URL (10)\n");
+		break;
+	default:
+		printf("Unknown option\n");
+		break;
+	}
+}
+
+BOOL GetProxySettings()
+{
+	INTERNET_PER_CONN_OPTION_LIST    List;
+	INTERNET_PER_CONN_OPTION         Option[10];
+	unsigned long                    nSize = sizeof(INTERNET_PER_CONN_OPTION_LIST);
+#define MAX_OPTIONS_NUMBER 10
+	Option[0].dwOption = INTERNET_PER_CONN_FLAGS;
+	Option[1].dwOption = INTERNET_PER_CONN_PROXY_SERVER;
+	Option[2].dwOption = INTERNET_PER_CONN_PROXY_BYPASS;
+	Option[3].dwOption = INTERNET_PER_CONN_AUTOCONFIG_URL;
+	Option[4].dwOption = INTERNET_PER_CONN_AUTODISCOVERY_FLAGS;
+	Option[5].dwOption = INTERNET_PER_CONN_AUTOCONFIG_SECONDARY_URL;
+	Option[6].dwOption = INTERNET_PER_CONN_AUTOCONFIG_RELOAD_DELAY_MINS;
+	Option[7].dwOption = INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_TIME;
+	Option[8].dwOption = INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_URL;
+	Option[9].dwOption = INTERNET_PER_CONN_FLAGS_UI;
+
+
+	List.dwSize = sizeof(INTERNET_PER_CONN_OPTION_LIST);
+	List.pszConnection = NULL;
+	List.dwOptionCount = 5;
+	List.dwOptionError = 0;
+	List.pOptions = Option;
+
+	if (!InternetQueryOption(NULL, INTERNET_OPTION_PER_CONNECTION_OPTION, &List, &nSize))
+		printf("InternetQueryOption failed! (%d)\n", GetLastError());
+
+	INTERNET_VERSION_INFO      Version;
+	nSize = sizeof(INTERNET_VERSION_INFO);
+
+	InternetQueryOption(NULL, INTERNET_OPTION_VERSION, &Version, &nSize);
+
+	for (unsigned int numOption = 0; numOption < MAX_OPTIONS_NUMBER; numOption++)
+	{
+		DumpPerConnOption(Option[numOption]);
+	}
+
+	return TRUE;
+}
 BOOL ConfigureProxy(SETPROXY_ACTION action)
 {
 	INTERNET_PER_CONN_OPTION_LIST    List;
@@ -196,7 +330,7 @@ BOOL SetProxyAutoConfig(__in_opt char * pszAutoURL)
 
 INT Usage()
 {
-	printf("SetProxy.exe Version 1.0\n");
+	printf("SetProxy.exe Version 1.1\n");
 	printf("SetProxy.exe autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports>\n");
 	printf("autoconfigURL http://proxy/autoconfig.pac \n");
 	printf("auto    --  Auto detect proxy settings.\n");
@@ -283,6 +417,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 		}
 
 	}
+	GetProxySettings();
 
 	switch (action)
 	{
