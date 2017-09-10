@@ -75,7 +75,7 @@ void DumpPerConnOption(INTERNET_PER_CONN_OPTION &Option)
 		{
 			printf("(%d)INTERNET_PER_CONN_FLAGS. Connection type value: %d\n", Option.dwOption, Option.Value.dwValue);
 		}
-		if (Option.dwOption == INTERNET_PER_CONN_FLAGS)
+		if (Option.dwOption == INTERNET_PER_CONN_FLAGS_UI)
 		{
 			printf("\n(%d)INTERNET_PER_CONN_FLAGS_UI. Connection type value: %d\n", Option.dwOption, Option.Value.dwValue);
 		}
@@ -97,28 +97,27 @@ void DumpPerConnOption(INTERNET_PER_CONN_OPTION &Option)
 			#define PROXY_TYPE_AUTO_DETECT                          0x00000008   // use autoproxy detection
 		*/
 
-		if (Option.Value.dwValue &  PROXY_TYPE_DIRECT)
+		if (Option.Value.dwValue & PROXY_TYPE_DIRECT)
 		{
-			printf("\tDIRECT(%d)\tThe connection does not use a proxy server.\n", Option.Value.dwValue);
+			printf("\tPROXY_TYPE_DIRECT(%d)\tThe connection does not use a proxy server.\n", PROXY_TYPE_DIRECT);
 		}
-		if (Option.Value.dwValue &   PROXY_TYPE_PROXY)
+		if (Option.Value.dwValue & PROXY_TYPE_PROXY)
 		{
-			printf("\tPROXY(%d)\tThe connection uses an explicitly set proxy server.\n", Option.Value.dwValue);
+			printf("\tPROXY_TYPE_PROXY(%d)\tThe connection uses an explicitly set proxy server.\n", PROXY_TYPE_PROXY);
 		}
-		if (Option.Value.dwValue &   PROXY_TYPE_AUTO_PROXY_URL)
+		if (Option.Value.dwValue & PROXY_TYPE_AUTO_PROXY_URL)
 		{
-			printf("\tAUTO_PROXY_URL(%d)\tThe connection downloads and processes an automatic configuration script at a specified URL.\n", Option.Value.dwValue);
+			printf("\tPROXY_TYPE_AUTO_PROXY_URL(%d)\tThe connection downloads and processes an automatic configuration script at a specified URL.\n", PROXY_TYPE_AUTO_PROXY_URL);
 		}
-		if (Option.Value.dwValue &   PROXY_TYPE_AUTO_DETECT)
+		if (Option.Value.dwValue & PROXY_TYPE_AUTO_DETECT)
 		{
-			printf("\tAUTO_DETECT(%d)\tThe connection automatically detects settings.\n", Option.Value.dwValue);
+			printf("\tPROXY_TYPE_AUTO_DETECT(%d)\tThe connection automatically detects settings.\n", PROXY_TYPE_AUTO_DETECT);
 		}
 		break;
 
 	case INTERNET_PER_CONN_PROXY_SERVER: //2
 		printf("\n(%d)INTERNET_PER_CONN_PROXY_SERVER\n", Option.dwOption);
 		//Sets or retrieves a string containing the proxy servers.
-
 		if (Option.Value.pszValue != NULL)
 		{
 			printf("\tProxy server :%s\n", Option.Value.pszValue);
@@ -139,7 +138,7 @@ void DumpPerConnOption(INTERNET_PER_CONN_OPTION &Option)
 		//Sets or retrieves a string containing the URL to the automatic configuration script. 
 		if (Option.Value.pszValue != NULL)
 		{
-			printf("AutoConfig url :%s\n", Option.Value.pszValue);
+			printf("\tAutoConfig url :%s\n", Option.Value.pszValue);
 			GlobalFree(Option.Value.pszValue);
 		}
 		break;
@@ -400,7 +399,8 @@ BOOL SetProxyAutoConfig(__in_opt char * pszAutoURL)
 INT Usage()
 {
 	printf("SetProxy.exe Version 1.1\n");
-	printf("SetProxy.exe autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports>\n");
+	printf("SetProxy.exe usage|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports>\n");
+	printf("Running setproxy with no parameters or usage displays current proxy configuration and help\n");
 	printf("autoconfigURL http://proxy/autoconfig.pac \n");
 	printf("auto    --  Auto detect proxy settings.\n");
 	printf("direct  --  Direct Internet Access, proxy disabled.\n");
@@ -423,7 +423,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 	INT iReturn = -1;
 
 	SETPROXY_ACTION action = USAGE;
-
+	BOOL bProxySettingsChanged = TRUE;
 	HRESULT hrCoInit = CoInitialize(NULL);
 
 	// this not getting called if the CoInit() fails won't be fatal
@@ -487,9 +487,9 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 
 	}
 	LogString("Currrent proxy settings");
-	LogString("***********************");
-	GetProxySettings();
 	LogString("***********************\n");
+	GetProxySettings();
+	LogString("\n***********************\n");
 
 	switch (action)
 	{
@@ -577,10 +577,18 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 		break;
 	case USAGE:
 	default:
+		bProxySettingsChanged = FALSE;
 		iReturn = Usage();
 		break;
 	}
 
+	if (bProxySettingsChanged)
+	{
+		LogString("New Proxy settings");
+		LogString("***********************\n");
+		GetProxySettings();
+		LogString("\n***********************\n");
+	}
 
 	if (SUCCEEDED(hrCoInit))
 	{
