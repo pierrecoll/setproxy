@@ -19,7 +19,8 @@ enum SETPROXY_ACTION
 	MANUALSERVER,
 	BYPASS,
 	AUTOCONFIG,
-	USAGE
+	USAGE,
+	RESET
 };
 
 
@@ -312,12 +313,13 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 	*/
 	List.dwSize = sizeof(INTERNET_PER_CONN_OPTION_LIST);
 	List.pszConnection = NULL;
-	List.dwOptionCount = 1;
+	List.dwOptionCount = 2;
 	List.dwOptionError = 0;
 	List.pOptions = Option;
 
-	Option[0].dwOption = INTERNET_PER_CONN_AUTODISCOVERY_FLAGS;
-	LogString("Calling InternetQueryOption with NULL handle and option INTERNET_OPTION_PER_CONNECTION_OPTION/INTERNET_PER_CONN_AUTODISCOVERY_FLAGS");
+	Option[1].dwOption = INTERNET_PER_CONN_AUTODISCOVERY_FLAGS;
+	Option[0].dwOption = INTERNET_PER_CONN_FLAGS;
+	LogString("Calling InternetQueryOption with NULL handle and option INTERNET_OPTION_PER_CONNECTION_OPTION/INTERNET_PER_CONN_AUTODISCOVERY_FLAGS and INTERNET_PER_CONN_FLAGS");
 	if (FALSE != InternetQueryOption(
 		NULL,
 		INTERNET_OPTION_PER_CONNECTION_OPTION,
@@ -325,7 +327,6 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 		&cbList))
 	{
 		LogString("InternetQueryOption succeeded");
-		Option[1].dwOption = INTERNET_PER_CONN_FLAGS;
 
 		/*
 		** InetCPL sets PROXY_TYPE_DIRECT regardless of the state of the
@@ -346,37 +347,43 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 		** autodetect enabled.
 		*/
 
-		Option[1].Value.dwValue = PROXY_TYPE_DIRECT;
-		LogString("Option:INTERNET_PER_CONN_FLAGS Value:PROXY_TYPE_DIRECT");
+		//Should be in the retrieved option
+		//Option[1].Value.dwValue = PROXY_TYPE_DIRECT;
+		//LogString("Option:INTERNET_PER_CONN_FLAGS Value:PROXY_TYPE_DIRECT");
 		if (AUTO == action)
 		{
-			Option[1].Value.dwValue |= PROXY_TYPE_AUTO_DETECT;
-			LogString("Option:INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_AUTO_DETECT");
-			Option[0].Value.dwValue |= AUTO_PROXY_FLAG_USER_SET;
-			LogString("Option:INTERNET_PER_CONN_AUTODISCOVERY_FLAGS Value |= AUTO_PROXY_FLAG_USER_SET");
+			Option[0].Value.dwValue |= PROXY_TYPE_AUTO_DETECT;
+			LogString("INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_AUTO_DETECT");
+			Option[1].Value.dwValue |= AUTO_PROXY_FLAG_USER_SET;
+			LogString("INTERNET_PER_CONN_AUTODISCOVERY_FLAGS Value |= AUTO_PROXY_FLAG_USER_SET");
 		}
 		else
 		{
-			Option[0].Value.dwValue &= ~AUTO_PROXY_FLAG_DETECTION_RUN;
-			LogString("Option:INTERNET_PER_CONN_AUTODISCOVERY_FLAGS Value &= ~AUTO_PROXY_FLAG_DETECTION_RUN");
+			Option[1].Value.dwValue &= ~AUTO_PROXY_FLAG_DETECTION_RUN;
+			LogString("INTERNET_PER_CONN_AUTODISCOVERY_FLAGS Value &= ~AUTO_PROXY_FLAG_DETECTION_RUN");
 			if (MANUAL == action)
 			{
-				Option[1].Value.dwValue |= PROXY_TYPE_PROXY;
-				LogString("Option:INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_PROXY");
+				Option[0].Value.dwValue |= PROXY_TYPE_PROXY;
+				LogString("INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_PROXY");
 			}
 			else if (AUTOCONFIG == action)
 			{
-				Option[1].Value.dwValue |= PROXY_TYPE_AUTO_PROXY_URL;
-				LogString("Option:INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_AUTO_PROXY_URL");
+				Option[0].Value.dwValue |= PROXY_TYPE_AUTO_PROXY_URL;
+				LogString("INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_AUTO_PROXY_URL");
 			}
-			// nothing left to do for DIRECT case
+			else if (action == RESET)
+			{
+				Option[0].Value.dwValue = 0;
+				LogString("INTERNET_PER_CONN_FLAGS Value set to zero");
+				Option[1].Value.dwValue &= ~AUTO_PROXY_FLAG_USER_SET;
+				LogString("INTERNET_PER_CONN_AUTODISCOVERY_FLAGS Value &= ~AUTO_PROXY_FLAG_USER_SET");
+			}
+			else if (action == DIRECT)
+			{
+				Option[0].Value.dwValue |= PROXY_TYPE_DIRECT;
+				LogString("INTERNET_PER_CONN_FLAGS |= PROXY_TYPE_DIRECT");
+			}
 		}
-
-		List.dwSize = sizeof(INTERNET_PER_CONN_OPTION_LIST);
-		List.pszConnection = NULL;
-		List.dwOptionCount = 2;
-		List.dwOptionError = 0;
-		List.pOptions = Option;
 
 		LogString("Calling InternetSetOption with NULL handle and option INTERNET_OPTION_PER_CONNECTION_OPTION");
 
@@ -446,7 +453,7 @@ BOOL SetProxyAutoConfig(__in_opt char * pszAutoURL)
 INT Usage()
 {
 	printf("SetProxy.exe Version 1.1\n");
-	printf("SetProxy.exe usage|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports>\n");
+	printf("SetProxy.exe usage|reset|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports>\n");
 	printf("Running setproxy with no parameters or usage displays current proxy configuration and help\n");
 	printf("autoconfigURL http://proxy/autoconfig.pac \n");
 	printf("auto    --  Auto detect proxy settings.\n");
@@ -531,7 +538,11 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 				pszBuffer = argv[2];
 			}
 		}
-
+		else if (0 == _strnicmp("reset", argv[1], 5))
+		{
+			action = RESET;
+			LogString("Resetting the proxy settings");
+		}
 	}
 	LogString("Currrent proxy settings");
 	LogString("***********************\n");
@@ -549,6 +560,17 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 		else
 		{
 			LogString("Failed to configure the Automatic Proxy detection.");
+		}
+		break;
+	case RESET:
+		if (TRUE == ConfigureProxy(RESET))
+		{
+			LogString("Successfully reset of WinINet proxy settings (including removing DIRECT!)");
+			iReturn = 0;
+		}
+		else
+		{
+			LogString("Failed to reset WinINet proxy settings.");
 		}
 		break;
 	case MANUAL:
