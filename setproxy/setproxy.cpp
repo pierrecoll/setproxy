@@ -63,10 +63,15 @@ void NotifyProxyChanged()
 #define INTERNET_PER_CONN_FLAGS_UI                      10
 */
 
-void DumpPerConnOption(INTERNET_PER_CONN_OPTION &Option)
+BOOL bProxyTypeDirect = FALSE;
+BOOL bProxyTypeProxy = FALSE;
+BOOL bProxyTypeAutoConfigUrl = FALSE;
+BOOL bProxyTypeAutoDetect = FALSE;
+
+BOOL DumpPerConnOption(INTERNET_PER_CONN_OPTION &Option)
 {
 	if (Option.Value.dwValue == 0)
-		return;
+		return TRUE;
 	switch (Option.dwOption)
 	{
 	case INTERNET_PER_CONN_FLAGS: //1
@@ -99,116 +104,150 @@ void DumpPerConnOption(INTERNET_PER_CONN_OPTION &Option)
 
 		if (Option.Value.dwValue & PROXY_TYPE_DIRECT)
 		{
-			printf("\tPROXY_TYPE_DIRECT(%d)\tThe connection does not use a proxy server.\n", PROXY_TYPE_DIRECT);
+			printf("\tPROXY_TYPE_DIRECT(%d)\tThe connection does not use a proxy server.\n", PROXY_TYPE_DIRECT);	
+			bProxyTypeDirect = TRUE;
+			if (Option.Value.dwValue == PROXY_TYPE_DIRECT)
+			{
+				//No need to look at other options
+				return FALSE;
+			}
 		}
 		if (Option.Value.dwValue & PROXY_TYPE_PROXY)
 		{
 			printf("\tPROXY_TYPE_PROXY(%d)\tThe connection uses an explicitly set proxy server.\n", PROXY_TYPE_PROXY);
+			bProxyTypeProxy = TRUE;
 		}
 		if (Option.Value.dwValue & PROXY_TYPE_AUTO_PROXY_URL)
 		{
 			printf("\tPROXY_TYPE_AUTO_PROXY_URL(%d)\tThe connection downloads and processes an automatic configuration script at a specified URL.\n", PROXY_TYPE_AUTO_PROXY_URL);
+			bProxyTypeAutoConfigUrl = TRUE;
 		}
 		if (Option.Value.dwValue & PROXY_TYPE_AUTO_DETECT)
 		{
 			printf("\tPROXY_TYPE_AUTO_DETECT(%d)\tThe connection automatically detects settings.\n", PROXY_TYPE_AUTO_DETECT);
+			bProxyTypeAutoDetect = TRUE;
 		}
 		break;
 
 	case INTERNET_PER_CONN_PROXY_SERVER: //2
-		printf("\n(%d)INTERNET_PER_CONN_PROXY_SERVER\n", Option.dwOption);
 		//Sets or retrieves a string containing the proxy servers.
-		if (Option.Value.pszValue != NULL)
+		if (bProxyTypeProxy)
 		{
-			printf("\tProxy server :%s\n", Option.Value.pszValue);
-			GlobalFree(Option.Value.pszValue);
+			printf("\n(%d)INTERNET_PER_CONN_PROXY_SERVER\n", Option.dwOption);
+			if (Option.Value.pszValue != NULL)
+			{
+				printf("\tProxy server : %s\n", Option.Value.pszValue);
+				GlobalFree(Option.Value.pszValue);
+			}
 		}
 		break;
 	case INTERNET_PER_CONN_PROXY_BYPASS:  //3
-		printf("\n(%d)INTERNET_PER_CONN_PROXY_BYPASS\n", Option.dwOption);
-		//Sets or retrieves a string containing the URLs that do not use the proxy server. 
-		if (Option.Value.pszValue != NULL)
+		if (bProxyTypeProxy)
 		{
-			printf("\tProxy bypass list :%s\n", Option.Value.pszValue);
-			GlobalFree(Option.Value.pszValue);
+			printf("\n(%d)INTERNET_PER_CONN_PROXY_BYPASS\n", Option.dwOption);
+			//Sets or retrieves a string containing the URLs that do not use the proxy server. 
+			if (Option.Value.pszValue != NULL)
+			{
+				printf("\tProxy bypass list :%s\n", Option.Value.pszValue);
+				GlobalFree(Option.Value.pszValue);
+			}
 		}
 		break;
 	case INTERNET_PER_CONN_AUTOCONFIG_URL: //4
-		printf("\n(%d)INTERNET_PER_CONN_AUTOCONFIG_URL\n", Option.dwOption);
-		//Sets or retrieves a string containing the URL to the automatic configuration script. 
-		if (Option.Value.pszValue != NULL)
+		if (bProxyTypeAutoConfigUrl)
 		{
-			printf("\tAutoConfig url :%s\n", Option.Value.pszValue);
-			GlobalFree(Option.Value.pszValue);
+			printf("\n(%d)INTERNET_PER_CONN_AUTOCONFIG_URL\n", Option.dwOption);
+			//Sets or retrieves a string containing the URL to the automatic configuration script. 
+			if (Option.Value.pszValue != NULL)
+			{
+				printf("\tAutoConfig url : %s\n", Option.Value.pszValue);
+				GlobalFree(Option.Value.pszValue);
+			}
 		}
 		break;
 	case INTERNET_PER_CONN_AUTODISCOVERY_FLAGS: //5
-		printf("\n(%d)INTERNET_PER_CONN_AUTODISCOVERY_FLAGS value: %d\n", Option.dwOption, Option.Value.dwValue);
-		//Sets or retrieves the automatic discovery settings.The Value member will contain one or more of the following values :
-		/*	AUTO_PROXY_FLAG_ALWAYS_DETECT
-			Always automatically detect settings.
-			AUTO_PROXY_FLAG_CACHE_INIT_RUN
-			Indicates that the cached results of the automatic proxy configuration script should be used, instead of actually running the script, unless the cached file has expired.
-			AUTO_PROXY_FLAG_DETECTION_RUN
-			Automatic detection has been run at least once on this connection.
-			AUTO_PROXY_FLAG_DETECTION_SUSPECT
-			Not currently supported.
-			AUTO_PROXY_FLAG_DONT_CACHE_PROXY_RESULT
-			Do not allow the caching of the result of the automatic proxy configuration script.
-			AUTO_PROXY_FLAG_MIGRATED
-			The setting was migrated from a Microsoft Internet Explorer 4.0 installation, and automatic detection should be attempted once.
-			AUTO_PROXY_FLAG_USER_SET
-			The user has explicitly set the automatic detection.*/
-		switch (Option.Value.dwValue)
+		if (bProxyTypeAutoDetect)
 		{
-		case AUTO_PROXY_FLAG_ALWAYS_DETECT:
-			printf("\tAUTO_PROXY_FLAG_ALWAYS_DETECT(0x%X)\tAlways automatically detect settings.\n", Option.Value.dwValue);
-			break;
-		case AUTO_PROXY_FLAG_CACHE_INIT_RUN:
-			printf("\tAUTO_PROXY_FLAG_CACHE_INIT_RUN(0x%X)\tThe cached results of the automatic proxy configuration script should be used, instead of actually running the script, unless the cached file has expired.\n", Option.Value.dwValue);
-			break;
-		case AUTO_PROXY_FLAG_DETECTION_RUN:
-			printf("\tAUTO_PROXY_FLAG_DETECTION_RUN(0x%X)\tAutomatic detection has been run at least once on this connection.\n", Option.Value.dwValue);
-			break;
-		case AUTO_PROXY_FLAG_DETECTION_SUSPECT:
-			printf("\tAUTO_PROXY_FLAG_DETECTION_SUSPECT(0x%X)\tNot currently supported. \n", Option.Value.dwValue);
-			break;
-		case AUTO_PROXY_FLAG_DONT_CACHE_PROXY_RESULT:
-			printf("\tAUTO_PROXY_FLAG_DONT_CACHE_PROXY_RESULT(0x%X)\tDo not allow the caching of the result of the automatic proxy configuration script.\n", Option.Value.dwValue);
-			break;
-		case AUTO_PROXY_FLAG_MIGRATED:
-			printf("\tAUTO_PROXY_FLAG_FLAG_MIGRATED(0x%X)\tThe setting was migrated from a Microsoft Internet Explorer 4.0 installation, and automatic detection should be attempted once.\n", Option.Value.dwValue);
-			break;
-		case AUTO_PROXY_FLAG_USER_SET:
-			//not true
-			//printf("\tUSER_SET(0x%X)\tThe user has explicitly set the automatic detection.\n", Option.Value.dwValue);
-			printf("\tAUTO_PROXY_FLAG_USER_SET(0x%X)\tThe user changed the setting.\n", Option.Value.dwValue);
-			break;
-		default:
-			printf("\tUnknown automatic descovery setting %d\n", Option.Value.dwValue);
-			break;
+			printf("\n(%d)INTERNET_PER_CONN_AUTODISCOVERY_FLAGS value: %d\n", Option.dwOption, Option.Value.dwValue);
+			//Sets or retrieves the automatic discovery settings.The Value member will contain one or more of the following values :
+			/*	AUTO_PROXY_FLAG_ALWAYS_DETECT
+				Always automatically detect settings.
+				AUTO_PROXY_FLAG_CACHE_INIT_RUN
+				Indicates that the cached results of the automatic proxy configuration script should be used, instead of actually running the script, unless the cached file has expired.
+				AUTO_PROXY_FLAG_DETECTION_RUN
+				Automatic detection has been run at least once on this connection.
+				AUTO_PROXY_FLAG_DETECTION_SUSPECT
+				Not currently supported.
+				AUTO_PROXY_FLAG_DONT_CACHE_PROXY_RESULT
+				Do not allow the caching of the result of the automatic proxy configuration script.
+				AUTO_PROXY_FLAG_MIGRATED
+				The setting was migrated from a Microsoft Internet Explorer 4.0 installation, and automatic detection should be attempted once.
+				AUTO_PROXY_FLAG_USER_SET
+				The user has explicitly set the automatic detection.*/
+			switch (Option.Value.dwValue)
+			{
+			case AUTO_PROXY_FLAG_ALWAYS_DETECT:
+				printf("\tAUTO_PROXY_FLAG_ALWAYS_DETECT(0x%X)\tAlways automatically detect settings.\n", Option.Value.dwValue);
+				break;
+			case AUTO_PROXY_FLAG_CACHE_INIT_RUN:
+				printf("\tAUTO_PROXY_FLAG_CACHE_INIT_RUN(0x%X)\tThe cached results of the automatic proxy configuration script should be used, instead of actually running the script, unless the cached file has expired.\n", Option.Value.dwValue);
+				break;
+			case AUTO_PROXY_FLAG_DETECTION_RUN:
+				printf("\tAUTO_PROXY_FLAG_DETECTION_RUN(0x%X)\tAutomatic detection has been run at least once on this connection.\n", Option.Value.dwValue);
+				break;
+			case AUTO_PROXY_FLAG_DETECTION_SUSPECT:
+				printf("\tAUTO_PROXY_FLAG_DETECTION_SUSPECT(0x%X)\tNot currently supported. \n", Option.Value.dwValue);
+				break;
+			case AUTO_PROXY_FLAG_DONT_CACHE_PROXY_RESULT:
+				printf("\tAUTO_PROXY_FLAG_DONT_CACHE_PROXY_RESULT(0x%X)\tDo not allow the caching of the result of the automatic proxy configuration script.\n", Option.Value.dwValue);
+				break;
+			case AUTO_PROXY_FLAG_MIGRATED:
+				printf("\tAUTO_PROXY_FLAG_FLAG_MIGRATED(0x%X)\tThe setting was migrated from a Microsoft Internet Explorer 4.0 installation, and automatic detection should be attempted once.\n", Option.Value.dwValue);
+				break;
+			case AUTO_PROXY_FLAG_USER_SET:
+				//not true
+				//printf("\tUSER_SET(0x%X)\tThe user has explicitly set the automatic detection.\n", Option.Value.dwValue);
+				printf("\tAUTO_PROXY_FLAG_USER_SET(0x%X)\tThe user changed the setting.\n", Option.Value.dwValue);
+				break;
+			default:
+				printf("\tUnknown automatic descovery setting %d\n", Option.Value.dwValue);
+				break;
+			}
 		}
 		break;
 	case INTERNET_PER_CONN_AUTOCONFIG_SECONDARY_URL: //6
-		printf("\n(%d)INTERNET_PER_CONN_AUTOCONFIG_SECONDARY_URL\n", Option.dwOption);
 		//Chained autoconfig URL.Used when the primary autoconfig URL points to an INS file that sets a second autoconfig URL for proxy information.
+		if (bProxyTypeAutoConfigUrl)
+		{
+			printf("\n(%d)INTERNET_PER_CONN_AUTOCONFIG_SECONDARY_URL\n", Option.dwOption);
+		}
 		break;
 	case INTERNET_PER_CONN_AUTOCONFIG_RELOAD_DELAY_MINS: //7
-		printf("\n(%d)INTERNET_PER_CONN_AUTOCONFIG_RELOAD_DELAY_MINS\n", Option.dwOption);
 		//of minutes until automatic refresh of autoconfig URL by autodiscovery
+		if (bProxyTypeAutoConfigUrl)
+		{
+			printf("\n(%d)INTERNET_PER_CONN_AUTOCONFIG_RELOAD_DELAY_MINS\n", Option.dwOption);
+		}
 		break;
 	case INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_TIME: //8
-		printf("\n(%d)INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_TIME\n", Option.dwOption);
 		//Read only option.Returns the time the last known good autoconfig URL was found using autodiscovery.
+		if (bProxyTypeAutoDetect)
+		{
+			printf("\n(%d)INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_TIME\n", Option.dwOption);
+		}
 		break;
 	case INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_URL: //9
-		printf("(%d)INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_URL\n", Option.dwOption);
-		//Read o\nnly option.Returns the last known good URL found using autodiscovery.
+		//Read only option.Returns the last known good URL found using autodiscovery.
+		if (bProxyTypeAutoDetect)
+		{
+			printf("(%d)INTERNET_PER_CONN_AUTOCONFIG_LAST_DETECT_URL\n", Option.dwOption);
+		}
 		break;
 	default:
 		printf("Unknown option %d\n", Option.dwOption);
 		break;
 	}
+	return TRUE;
 }
 
 BOOL GetProxySettings()
@@ -218,6 +257,11 @@ BOOL GetProxySettings()
 	INTERNET_PER_CONN_OPTION_LIST    List;
 	INTERNET_PER_CONN_OPTION         Option[10];
 	unsigned long                    nSize = sizeof(INTERNET_PER_CONN_OPTION_LIST);
+
+	bProxyTypeDirect = FALSE;
+	bProxyTypeProxy = FALSE;
+	bProxyTypeAutoConfigUrl = FALSE;
+	bProxyTypeAutoDetect = FALSE;
 
 	Option[0].dwOption = INTERNET_PER_CONN_FLAGS;
 	Option[1].dwOption = INTERNET_PER_CONN_PROXY_SERVER;
@@ -246,7 +290,10 @@ BOOL GetProxySettings()
 
 	for (unsigned int numOption = 0; numOption < MAX_OPTIONS_NUMBER; numOption++)
 	{
-		DumpPerConnOption(Option[numOption]);
+		if (DumpPerConnOption(Option[numOption]) == FALSE)
+		{
+			break;
+		}
 	}
 
 	return TRUE;
@@ -584,7 +631,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 
 	if (bProxySettingsChanged)
 	{
-		LogString("New Proxy settings");
+		LogString("\nNew Proxy settings");
 		LogString("***********************\n");
 		GetProxySettings();
 		LogString("\n***********************\n");
