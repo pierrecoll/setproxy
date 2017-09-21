@@ -23,6 +23,8 @@ enum SETPROXY_ACTION
 	RESET
 };
 
+//need to find out maximum length for connection name
+CHAR ConnectionName[1024]="";
 
 void LogString(const char *lpsz, ...)
 {
@@ -276,7 +278,7 @@ BOOL GetProxySettings()
 	Option[9].dwOption = INTERNET_PER_CONN_FLAGS_UI;
 
 	List.dwSize = sizeof(INTERNET_PER_CONN_OPTION_LIST);
-	List.pszConnection = NULL;
+	List.pszConnection = ConnectionName;
 	List.dwOptionCount = MAX_OPTIONS_NUMBER;
 	List.dwOptionError = 0;
 	List.pOptions = Option;
@@ -312,7 +314,7 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 	** case of setting autodetect.
 	*/
 	List.dwSize = sizeof(INTERNET_PER_CONN_OPTION_LIST);
-	List.pszConnection = NULL;
+	List.pszConnection = ConnectionName;
 	List.dwOptionCount = 2;
 	List.dwOptionError = 0;
 	List.pOptions = Option;
@@ -452,9 +454,11 @@ BOOL SetProxyAutoConfig(__in_opt char * pszAutoURL)
 
 INT Usage()
 {
-	printf("SetProxy.exe Version 1.1\n");
+	printf("SetProxy.exe Version 1.2\n");
 	printf("SetProxy.exe usage|reset|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports>\n");
 	printf("Running setproxy with no parameters or usage displays current proxy configuration and help\n");
+	printf("usage    --  Shows current proxy settings and help.\n");
+	printf("reset    --  Resets proxy settings (DIRECT included).\n");
 	printf("autoconfigURL http://proxy/autoconfig.pac \n");
 	printf("auto    --  Auto detect proxy settings.\n");
 	printf("direct  --  Direct Internet Access, proxy disabled.\n");
@@ -479,6 +483,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 	SETPROXY_ACTION action = USAGE;
 	BOOL bProxySettingsChanged = TRUE;
 	HRESULT hrCoInit = CoInitialize(NULL);
+
 
 	// this not getting called if the CoInit() fails won't be fatal
 	// g_pIStatus will still be NULL, so all the LogString() calls will 
