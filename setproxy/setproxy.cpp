@@ -19,7 +19,7 @@ enum SETPROXY_ACTION
 	MANUALSERVER,
 	BYPASS,
 	AUTOCONFIG,
-	USAGE,
+	SHOW,
 	RESET
 };
 
@@ -290,12 +290,12 @@ BOOL GetProxySettings()
 		exit(-1L);
 	}
 
-	INTERNET_VERSION_INFO      Version;
+	/*INTERNET_VERSION_INFO      Version;
 	nSize = sizeof(INTERNET_VERSION_INFO);
 
 	LogString("Calling InternetQueryOption with NULL handle and option INTERNET_OPTION_VERSION");
 	InternetQueryOption(NULL, INTERNET_OPTION_VERSION, &Version, &nSize);
-	printf("Version : %d.%d\n", Version.dwMajorVersion, Version.dwMinorVersion);
+	printf("Version : %d.%d\n", Version.dwMajorVersion, Version.dwMinorVersion);*/
 
 	for (unsigned int numOption = 0; numOption < MAX_OPTIONS_NUMBER; numOption++)
 	{
@@ -314,6 +314,19 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 	unsigned long                    cbList = sizeof(INTERNET_PER_CONN_OPTION_LIST);
 
 	BOOL bReturn = FALSE;
+
+	if (ConnectionName != NULL)
+	{
+		LogString("Currrent proxy settings for Connection : %s\n", ConnectionName);
+	}
+	else
+	{
+		LogString("Currrent proxy settings for Lan Settings\n");
+	}
+
+	LogString("***********************\n");
+	GetProxySettings();
+	LogString("\n***********************\n");
 
 	/*
 	** First have to query for autodiscovery flags. They're used later in the
@@ -410,9 +423,7 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 	{
 		LogString("InternetQueryOption failed for ConfigureProxy! (%d)\n", GetLastError());
 	}
-
 	return bReturn;
-
 }
 
 BOOL SetProxyOption(__in_opt INT iProxyOption, __in_opt TCHAR * pszValue)
@@ -458,13 +469,14 @@ BOOL SetProxyAutoConfig(__in_opt TCHAR * pszAutoURL)
 	return SetProxyOption(INTERNET_PER_CONN_AUTOCONFIG_URL, pszAutoURL);
 }
 
-INT Usage()
+void Usage()
 {
 	printf("SetProxy.exe Version 1.2\n");
 	printf("SetProxy.exe usage|reset|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports> [ConnectionName]\n");
-	printf("Running setproxy with no parameters or usage displays current proxy configuration and help\n");
-	printf("usage    --  Shows current proxy settings and help.\n");
-	printf("reset    --  Resets proxy settings (DIRECT included).\n");
+	printf("Running setproxy with no parameters displays help\n");
+	printf("Connection name is optional. By default, setproxy will use the Local Area Network (LAN) Settings connection\n");
+	printf("show    --  shows current configuration for connection.\n");
+	printf("reset   --  Resets proxy settings (DIRECT included).\n");
 	printf("autoconfigURL http://proxy/autoconfig.pac \n");
 	printf("auto    --  Auto detect proxy settings.\n");
 	printf("direct  --  Direct Internet Access, proxy disabled.\n");
@@ -475,19 +487,16 @@ INT Usage()
 	printf("bypass \"172.*;157.*;10.*;127.*;<local>\"\n");
 	printf("\nReferences\n**********\n");
 	printf("Setting and Retrieving Internet Options https://msdn.microsoft.com/en-us/library/aa385384(v=vs.85).aspx\n");
-	printf("How to programmatically query and set proxy settings under WinINet https://support.microsoft.com/en-us/help/226473/how-to-programmatically-query-and-set-proxy-settings-under-internet-ex\n");
+	printf("How to programmatically query and set proxy settings under WinINet:\n");
+	printf("https://support.microsoft.com/en-us/help/226473/how-to-programmatically-query-and-set-proxy-settings-under-internet-ex\n");
 	printf("InternetQueryOption function https://msdn.microsoft.com/en-us/library/aa385101(v=vs.85).aspx\n");
-	return 0; 
 }
-
-
 
 INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 {
 	INT iReturn = -1;
 
-	SETPROXY_ACTION action = USAGE;
-	BOOL bProxySettingsChanged = TRUE;
+	SETPROXY_ACTION action = SHOW;
 	HRESULT hrCoInit = CoInitialize(NULL);
 
 
@@ -500,7 +509,11 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 	}
 
 	TCHAR * pszBuffer = NULL;
-
+	if (argc == 1)
+	{
+		Usage();
+		return 0L;
+	}
 	if (argc >1)
 	{
 		// AutoconfigURL should be before Auto since first 4 letters are the same 
@@ -578,6 +591,14 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 				ConnectionName = argv[2];
 			}
 		}
+		else if (0 == _strnicmp("show", argv[1], 5))
+		{
+			action = SHOW;
+			if (argc > 2)
+			{
+				ConnectionName = argv[2];
+			}
+		}
 		else
 		{
 			if (argc > 1)
@@ -586,24 +607,12 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 			}
 		}
 	}
-	LogString("Currrent proxy settings");
+
 	if (ConnectionName != NULL)
 	{
-		LogString("For Connection : %s\n",ConnectionName);
-		//char nConnectioName[1024];
-
-		//mbtowc(ConnectionName, ConnectionName);
-		//printf("%s\n", ConnectionName);
-
+		LogString("Warning : if connection name  %s does not exits , it will be created with LAN Settings!\n", ConnectionName);
+		LogString("Warning if connection name contains non ASCII character (accentuated), the created entry will not be correct on Windows Creators Update\n");
 	}
-	else
-	{
-		LogString("For Lan Settings\n");
-	}
-
-	LogString("***********************\n");
-	GetProxySettings();
-	LogString("\n***********************\n");
 
 	switch (action)
 	{
@@ -700,20 +709,35 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 			LogString("Failed to configure the Proxy settings to Manual.");
 		}
 		break;
-	case USAGE:
-	default:
-		bProxySettingsChanged = FALSE;
-		iReturn = Usage();
-		break;
-	}
-
-	if (bProxySettingsChanged)
-	{
-		LogString("\nNew Proxy settings");
+	case SHOW:
+		if (ConnectionName != NULL)
+		{
+			LogString("Currrent proxy settings for Connection : %s\n", ConnectionName);
+		}
+		else
+		{
+			LogString("Currrent proxy settings for Lan Settings\n");
+		}
 		LogString("***********************\n");
 		GetProxySettings();
 		LogString("\n***********************\n");
+		return 0L;
+	default:
+		Usage();
+		return 0L;
 	}
+
+	if (ConnectionName != NULL)
+	{
+		LogString("New proxy settings for Connection : %s\n", ConnectionName);
+	}
+	else
+	{
+		LogString("New proxy settings for Lan Settings\n");
+	}
+	LogString("***********************\n");
+	GetProxySettings();
+	LogString("\n***********************\n");
 
 	if (SUCCEEDED(hrCoInit))
 	{
