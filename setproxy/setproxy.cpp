@@ -24,11 +24,11 @@ enum SETPROXY_ACTION
 };
 
 //need to find out maximum length for connection name
-CHAR ConnectionName[1024]="";
+TCHAR *ConnectionName=NULL;
 
-void LogString(const char *lpsz, ...)
+void LogString(const TCHAR *lpsz, ...)
 {
-	char szBuffer[1024] = { 0 };
+	TCHAR szBuffer[1024] = { 0 };
 	va_list     list;
 	va_start(list, lpsz);
 	HRESULT hr = StringCchVPrintf(szBuffer, ARRAYSIZE(szBuffer), lpsz, list);
@@ -283,13 +283,19 @@ BOOL GetProxySettings()
 	List.dwOptionError = 0;
 	List.pOptions = Option;
 
+	LogString("Calling InternetQueryOption with NULL handle and option INTERNET_OPTION_PER_CONNECTION_OPTION and 10 options");
 	if (!InternetQueryOption(NULL, INTERNET_OPTION_PER_CONNECTION_OPTION, &List, &nSize))
+	{
 		printf("InternetQueryOption failed! (%d)\n", GetLastError());
+		exit(-1L);
+	}
 
 	INTERNET_VERSION_INFO      Version;
 	nSize = sizeof(INTERNET_VERSION_INFO);
 
+	LogString("Calling InternetQueryOption with NULL handle and option INTERNET_OPTION_VERSION");
 	InternetQueryOption(NULL, INTERNET_OPTION_VERSION, &Version, &nSize);
+	printf("Version : %d.%d\n", Version.dwMajorVersion, Version.dwMinorVersion);
 
 	for (unsigned int numOption = 0; numOption < MAX_OPTIONS_NUMBER; numOption++)
 	{
@@ -409,7 +415,7 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 
 }
 
-BOOL SetProxyOption(__in_opt INT iProxyOption, __in_opt char * pszValue)
+BOOL SetProxyOption(__in_opt INT iProxyOption, __in_opt TCHAR * pszValue)
 {
 	BOOL bReturn = FALSE;
 
@@ -421,7 +427,7 @@ BOOL SetProxyOption(__in_opt INT iProxyOption, __in_opt char * pszValue)
 	Option[0].Value.pszValue = pszValue;
 
 	List.dwSize = sizeof(INTERNET_PER_CONN_OPTION_LIST);
-	List.pszConnection = NULL;
+	List.pszConnection = ConnectionName;
 	List.dwOptionCount = 1;
 	List.dwOptionError = 0;
 	List.pOptions = Option;
@@ -439,15 +445,15 @@ BOOL SetProxyOption(__in_opt INT iProxyOption, __in_opt char * pszValue)
 	return bReturn;
 
 }
-BOOL SetProxyServer(__in_opt char * pszHostPort)
+BOOL SetProxyServer(__in_opt TCHAR * pszHostPort)
 {
 	return SetProxyOption(INTERNET_PER_CONN_PROXY_SERVER, pszHostPort);
 }
-BOOL SetProxyByPass(__in_opt char * pszByPass)
+BOOL SetProxyByPass(__in_opt TCHAR * pszByPass)
 {
 	return SetProxyOption(INTERNET_PER_CONN_PROXY_BYPASS, pszByPass);
 }
-BOOL SetProxyAutoConfig(__in_opt char * pszAutoURL)
+BOOL SetProxyAutoConfig(__in_opt TCHAR * pszAutoURL)
 {
 	return SetProxyOption(INTERNET_PER_CONN_AUTOCONFIG_URL, pszAutoURL);
 }
@@ -455,7 +461,7 @@ BOOL SetProxyAutoConfig(__in_opt char * pszAutoURL)
 INT Usage()
 {
 	printf("SetProxy.exe Version 1.2\n");
-	printf("SetProxy.exe usage|reset|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports>\n");
+	printf("SetProxy.exe usage|reset|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports> [ConnectionName]\n");
 	printf("Running setproxy with no parameters or usage displays current proxy configuration and help\n");
 	printf("usage    --  Shows current proxy settings and help.\n");
 	printf("reset    --  Resets proxy settings (DIRECT included).\n");
@@ -493,7 +499,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 		exit(-1L);
 	}
 
-	char * pszBuffer = NULL;
+	TCHAR * pszBuffer = NULL;
 
 	if (argc >1)
 	{
@@ -507,6 +513,10 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 			if (argc >2)
 			{
 				pszBuffer = argv[2];
+				if (argc > 3)
+				{
+					ConnectionName = argv[3];
+				}
 			}
 			else
 			{
@@ -518,6 +528,10 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 		{
 			action = AUTO;
 			LogString("Setting Auto detect proxy settings.");
+			if (argc > 2)
+			{
+				ConnectionName = argv[2];
+			}
 		}
 		else if (0 == _strnicmp("manual", argv[1], 6))
 		{
@@ -528,11 +542,19 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 				LogString("Setting Hardcoded proxy");
 				pszBuffer = argv[2];
 			}
+			if (argc > 3)
+			{
+				ConnectionName = argv[3];
+			}
 		}
 		else if (0 == _strnicmp("direct", argv[1], 6))
 		{
 			action = DIRECT;
 			LogString("Setting Direct Internet Access, proxy disabled.");
+			if (argc > 2)
+			{
+				ConnectionName = argv[2];
+			}
 		}
 		else if (0 == _strnicmp("bypass", argv[1], 6))
 		{
@@ -542,14 +564,43 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 				LogString("Setting the Proxy Bypass addresses");
 				pszBuffer = argv[2];
 			}
+			if (argc > 3)
+			{
+				ConnectionName = argv[3];
+			}
 		}
 		else if (0 == _strnicmp("reset", argv[1], 5))
 		{
 			action = RESET;
 			LogString("Resetting the proxy settings");
+			if (argc > 2)
+			{
+				ConnectionName = argv[2];
+			}
+		}
+		else
+		{
+			if (argc > 1)
+			{
+				ConnectionName = argv[1];
+			}
 		}
 	}
 	LogString("Currrent proxy settings");
+	if (ConnectionName != NULL)
+	{
+		LogString("For Connection : %s\n",ConnectionName);
+		//char nConnectioName[1024];
+
+		//mbtowc(ConnectionName, ConnectionName);
+		//printf("%s\n", ConnectionName);
+
+	}
+	else
+	{
+		LogString("For Lan Settings\n");
+	}
+
 	LogString("***********************\n");
 	GetProxySettings();
 	LogString("\n***********************\n");
@@ -595,12 +646,12 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 		{
 			if (TRUE == SetProxyServer(pszBuffer))
 			{
-				LogString("Successfully configured WinINet Manual Proxy server to %s.", pszBuffer);
+				LogString("Successfully configured WinINet Manual Proxy server to %S.", pszBuffer);
 				iReturn = 0;
 			}
 			else
 			{
-				LogString("Failed to configure the Manual Proxy server using %s.", pszBuffer);
+				LogString("Failed to configure the Manual Proxy server using %S.", pszBuffer);
 			}
 		}
 		else
@@ -622,7 +673,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 	case BYPASS:
 		if (TRUE == SetProxyByPass(pszBuffer))
 		{
-			LogString("Successfully configured WinINet Proxy ByPass settings to %s.", pszBuffer);
+			LogString("Successfully configured WinINet Proxy ByPass settings to %S.", pszBuffer);
 			iReturn = 0;
 		}
 		else
@@ -636,12 +687,12 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 
 			if (TRUE == SetProxyAutoConfig(pszBuffer))
 			{
-				LogString("Successfully configured WinINet AutoconfigURL to %s.", pszBuffer);
+				LogString("Successfully configured WinINet AutoconfigURL to %S.", pszBuffer);
 				iReturn = 0;
 			}
 			else
 			{
-				LogString("Failed to configure IE to AutoconfigURL using %s.", pszBuffer);
+				LogString("Failed to configure IE to AutoconfigURL using %S.", pszBuffer);
 			}
 		}
 		else
