@@ -8,6 +8,9 @@
 #include <wininet.h>
 #define STRSAFE_NO_DEPRECATE
 #include <strsafe.h>
+#include "ras.h"
+#include "raserror.h"
+#pragma comment(lib, "rasapi32.lib")
 
 #pragma comment(lib, "wininet.lib")
 
@@ -25,6 +28,53 @@ enum SETPROXY_ACTION
 
 //need to find out maximum length for connection name
 TCHAR *ConnectionName=NULL;
+
+BOOL EnumConnections()
+{
+	DWORD dwCb = 0;
+	DWORD dwRet = ERROR_SUCCESS;
+	DWORD dwEntries = 0;
+	LPRASENTRYNAME lpRasEntryName = NULL;
+
+	// Call RasEnumEntries with lpRasEntryName = NULL. dwCb is returned with the required buffer size and 
+	// a return code of ERROR_BUFFER_TOO_SMALL
+	dwRet = RasEnumEntries(NULL, NULL, lpRasEntryName, &dwCb, &dwEntries);
+
+	if (dwRet == ERROR_BUFFER_TOO_SMALL) {
+		// Allocate the memory needed for the array of RAS entry names.
+		lpRasEntryName = (LPRASENTRYNAME)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwCb);
+		if (lpRasEntryName == NULL) {
+			wprintf(L"HeapAlloc failed!\n");
+			return FALSE;
+		}
+		// The first RASENTRYNAME structure in the array must contain the structure size
+		lpRasEntryName[0].dwSize = sizeof(RASENTRYNAME);
+
+		// Call RasEnumEntries to enumerate all RAS entry names
+		dwRet = RasEnumEntries(NULL, NULL, lpRasEntryName, &dwCb, &dwEntries);
+
+		// If successful, print the RAS entry names 
+		if (ERROR_SUCCESS == dwRet) {
+			wprintf(L"The following RAS entry names were found:\n");
+			for (DWORD i = 0; i < dwEntries; i++) {
+				wprintf(L"%S\n", lpRasEntryName[i].szEntryName);
+			}
+		}
+		//Deallocate memory for the connection buffer
+		HeapFree(GetProcessHeap(), 0, lpRasEntryName);
+		lpRasEntryName = NULL;
+		return FALSE;
+	}
+
+	// There was either a problem with RAS or there are RAS entry names to enumerate    
+	if (dwEntries >= 1) {
+		wprintf(L"The operation failed to acquire the buffer size.\n");
+	}
+	else {
+		wprintf(L"There were no RAS entry names found:.\n");
+	}
+	return TRUE;
+}
 
 void LogString(const TCHAR *lpsz, ...)
 {
@@ -471,9 +521,9 @@ BOOL SetProxyAutoConfig(__in_opt TCHAR * pszAutoURL)
 
 void Usage()
 {
-	printf("SetProxy.exe Version 1.2\n");
+	printf("SetProxy.exe Version 1.3\n");
 	printf("SetProxy.exe usage|reset|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports> [ConnectionName]\n");
-	printf("Running setproxy with no parameters displays help\n");
+	printf("Running setproxy with no parameters displays help and connections\n");
 	printf("Connection name is optional. By default, setproxy will use the Local Area Network (LAN) Settings connection\n");
 	printf("show    --  shows current configuration for connection.\n");
 	printf("reset   --  Resets proxy settings (DIRECT included).\n");
@@ -511,6 +561,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
 	TCHAR * pszBuffer = NULL;
 	if (argc == 1)
 	{
+		EnumConnections();
 		Usage();
 		return 0L;
 	}
