@@ -29,6 +29,297 @@ enum SETPROXY_ACTION
 //need to find out maximum length for connection name
 TCHAR *ConnectionName=NULL;
 
+BOOL EnumConnections();
+void LogString(const TCHAR* lpsz, ...);
+BOOL ConfigureProxy(SETPROXY_ACTION action);
+BOOL SetProxyOption(__in_opt INT iProxyOption, __in_opt TCHAR* pszValue);
+BOOL GetProxySettings();
+BOOL SetProxyServer(__in_opt TCHAR* pszHostPort);
+BOOL SetProxyByPass(__in_opt TCHAR* pszByPass);
+BOOL SetProxyAutoConfig(__in_opt TCHAR* pszAutoURL);
+
+
+
+void Usage()
+{
+	printf("SetProxy.exe Version 1.4\n");
+	printf("SetProxy.exe usage|reset|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports> [ConnectionName]\n");
+	printf("Running setproxy with no parameters displays help and connections\n");
+	printf("Connection name is optional. By default, setproxy will use the Local Area Network (LAN) Settings connection\n");
+	printf("show    --  shows current configuration for connection.\n");
+	printf("reset   --  Resets proxy settings (DIRECT included).\n");
+	printf("autoconfigURL http://proxy/autoconfig.pac \n");
+	printf("auto    --  Auto detect proxy settings.\n");
+	printf("direct  --  Direct Internet Access, proxy disabled.\n");
+	printf("manual  --  Manually Set proxy settings (use existing settings).\n");
+	printf("bypass  --  Set the Proxy Bypass addresses.\n");
+	printf("manual http=HOST:PORT[;ftp=HOST:PORT]  --  (configure server)\n");
+	printf("manual http=http://proxy:80;https=https://proxy:80\n");
+	printf("bypass \"172.*;157.*;10.*;127.*;<local>\"\n");
+	printf("\nReferences\n**********\n");
+	printf("Setting and Retrieving Internet Options https://msdn.microsoft.com/en-us/library/aa385384(v=vs.85).aspx\n");
+	printf("How to programmatically query and set proxy settings under WinINet:\n");
+	printf("https://support.microsoft.com/en-us/help/226473/how-to-programmatically-query-and-set-proxy-settings-under-internet-ex\n");
+	printf("InternetQueryOption function https://msdn.microsoft.com/en-us/library/aa385101(v=vs.85).aspx\n");
+}
+
+INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
+{
+	INT iReturn = -1;
+
+	SETPROXY_ACTION action = SHOW;
+	HRESULT hrCoInit = CoInitialize(NULL);
+
+
+	// this not getting called if the CoInit() fails won't be fatal
+	// g_pIStatus will still be NULL, so all the LogString() calls will 
+	// just skip over making the call into Piper for that portion of the logging
+	if (FAILED(hrCoInit))
+	{
+		exit(-1L);
+	}
+
+	TCHAR* pszBuffer = NULL;
+	if (argc == 1)
+	{
+		EnumConnections();
+		Usage();
+		return 0L;
+	}
+	if (argc > 1)
+	{
+		// AutoconfigURL should be before Auto since first 4 letters are the same 
+		if (0 == _strnicmp("autoconfigURL", argv[1], 13))
+		{
+			// Adding the Action before if (argc >2) statement since user might specify blank as the autoconfig 
+			// Incase user specifies blank in Inetcpl.cpl then the connection is returned to Direct. We are simulating this behaviour			
+			action = AUTOCONFIG;
+			LogString("Setting AutoConfig url");
+			if (argc > 2)
+			{
+				pszBuffer = argv[2];
+				if (argc > 3)
+				{
+					ConnectionName = argv[3];
+				}
+			}
+			else
+			{
+				pszBuffer = "";
+			}
+
+		}
+		else if (0 == _strnicmp("auto", argv[1], 4))
+		{
+			action = AUTO;
+			LogString("Setting Auto detect proxy settings.");
+			if (argc > 2)
+			{
+				ConnectionName = argv[2];
+			}
+		}
+		else if (0 == _strnicmp("manual", argv[1], 6))
+		{
+			action = MANUAL;
+			if (argc > 2)
+			{
+				action = MANUALSERVER;
+				LogString("Setting Hardcoded proxy");
+				pszBuffer = argv[2];
+			}
+			if (argc > 3)
+			{
+				ConnectionName = argv[3];
+			}
+		}
+		else if (0 == _strnicmp("direct", argv[1], 6))
+		{
+			action = DIRECT;
+			LogString("Setting Direct Internet Access, proxy disabled.");
+			if (argc > 2)
+			{
+				ConnectionName = argv[2];
+			}
+		}
+		else if (0 == _strnicmp("bypass", argv[1], 6))
+		{
+			if (argc > 2)
+			{
+				action = BYPASS;
+				LogString("Setting the Proxy Bypass addresses");
+				pszBuffer = argv[2];
+			}
+			if (argc > 3)
+			{
+				ConnectionName = argv[3];
+			}
+		}
+		else if (0 == _strnicmp("reset", argv[1], 5))
+		{
+			action = RESET;
+			LogString("Resetting the proxy settings");
+			if (argc > 2)
+			{
+				ConnectionName = argv[2];
+			}
+		}
+		else if (0 == _strnicmp("show", argv[1], 5))
+		{
+			action = SHOW;
+			if (argc > 2)
+			{
+				ConnectionName = argv[2];
+			}
+		}
+		else
+		{
+			if (argc > 1)
+			{
+				ConnectionName = argv[1];
+			}
+		}
+	}
+
+	if (ConnectionName != NULL)
+	{
+		LogString("Warning : if connection name  %s does not exits , it will be created with LAN Settings!\n", ConnectionName);
+		LogString("Warning if connection name contains non ASCII character (accentuated), the created entry will not be correct on Windows Creators Update\n");
+	}
+
+	switch (action)
+	{
+	case AUTO:
+		if (TRUE == ConfigureProxy(AUTO))
+		{
+			LogString("Successfully configured WinINet to use the Automatic Proxy detection.");
+			iReturn = 0;
+		}
+		else
+		{
+			LogString("Failed to configure the Automatic Proxy detection.");
+		}
+		break;
+	case RESET:
+		if (TRUE == ConfigureProxy(RESET))
+		{
+			LogString("Successfully reset of WinINet proxy settings (including removing DIRECT!)");
+			iReturn = 0;
+		}
+		else
+		{
+			LogString("Failed to reset WinINet proxy settings.");
+		}
+		break;
+	case MANUAL:
+		if (TRUE == ConfigureProxy(MANUAL))
+		{
+			LogString("Successfully configured WinINet to use Manual Proxy settings.");
+			iReturn = 0;
+		}
+		else
+		{
+			LogString("Failed to configure the Proxy settings to Manual.");
+		}
+		break;
+
+	case MANUALSERVER:
+		if (TRUE == ConfigureProxy(MANUAL))
+		{
+			if (TRUE == SetProxyServer(pszBuffer))
+			{
+				LogString("Successfully configured WinINet Manual Proxy server to %S.", pszBuffer);
+				iReturn = 0;
+			}
+			else
+			{
+				LogString("Failed to configure the Manual Proxy server using %S.", pszBuffer);
+			}
+		}
+		else
+		{
+			LogString("Failed to configure the Proxy settings to Manual.");
+		}
+		break;
+	case DIRECT:
+		if (TRUE == ConfigureProxy(DIRECT))
+		{
+			LogString("Successfully configured WinINet to use Direct Internet access. The Proxy setting have been turned off.");
+			iReturn = 0;
+		}
+		else
+		{
+			LogString("Failed to configure the Proxy setting for Direct Internet Access.");
+		}
+		break;
+	case BYPASS:
+		if (TRUE == SetProxyByPass(pszBuffer))
+		{
+			LogString("Successfully configured WinINet Proxy ByPass settings to %S.", pszBuffer);
+			iReturn = 0;
+		}
+		else
+		{
+			LogString("Failed to configure the Proxy ByPass settings.");
+		}
+		break;
+	case AUTOCONFIG:
+		if (TRUE == ConfigureProxy(AUTOCONFIG))
+		{
+
+			if (TRUE == SetProxyAutoConfig(pszBuffer))
+			{
+				LogString("Successfully configured WinINet AutoconfigURL to %S.", pszBuffer);
+				iReturn = 0;
+			}
+			else
+			{
+				LogString("Failed to configure IE to AutoconfigURL using %S.", pszBuffer);
+			}
+		}
+		else
+		{
+			LogString("Failed to configure the Proxy settings to Manual.");
+		}
+		break;
+	case SHOW:
+		if (ConnectionName != NULL)
+		{
+			LogString("Currrent proxy settings for Connection : %s\n", ConnectionName);
+		}
+		else
+		{
+			LogString("Currrent proxy settings for Lan Settings\n");
+		}
+		LogString("***********************\n");
+		GetProxySettings();
+		LogString("\n***********************\n");
+		return 0L;
+	default:
+		Usage();
+		return 0L;
+	}
+
+	if (ConnectionName != NULL)
+	{
+		LogString("New proxy settings for Connection : %s\n", ConnectionName);
+	}
+	else
+	{
+		LogString("New proxy settings for Lan Settings\n");
+	}
+	LogString("***********************\n");
+	GetProxySettings();
+	LogString("\n***********************\n");
+
+	if (SUCCEEDED(hrCoInit))
+	{
+		CoUninitialize();
+	}
+
+	return iReturn;
+
+}
+
 BOOL EnumConnections()
 {
 	DWORD dwCb = 0;
@@ -519,282 +810,3 @@ BOOL SetProxyAutoConfig(__in_opt TCHAR * pszAutoURL)
 	return SetProxyOption(INTERNET_PER_CONN_AUTOCONFIG_URL, pszAutoURL);
 }
 
-void Usage()
-{
-	printf("SetProxy.exe Version 1.3\n");
-	printf("SetProxy.exe usage|reset|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports> [ConnectionName]\n");
-	printf("Running setproxy with no parameters displays help and connections\n");
-	printf("Connection name is optional. By default, setproxy will use the Local Area Network (LAN) Settings connection\n");
-	printf("show    --  shows current configuration for connection.\n");
-	printf("reset   --  Resets proxy settings (DIRECT included).\n");
-	printf("autoconfigURL http://proxy/autoconfig.pac \n");
-	printf("auto    --  Auto detect proxy settings.\n");
-	printf("direct  --  Direct Internet Access, proxy disabled.\n");
-	printf("manual  --  Manually Set proxy settings (use existing settings).\n");
-	printf("bypass  --  Set the Proxy Bypass addresses.\n");
-	printf("manual http=HOST:PORT[;ftp=HOST:PORT]  --  (configure server)\n");
-	printf("manual http=http://proxy:80;https=https://proxy:80\n");
-	printf("bypass \"172.*;157.*;10.*;127.*;<local>\"\n");
-	printf("\nReferences\n**********\n");
-	printf("Setting and Retrieving Internet Options https://msdn.microsoft.com/en-us/library/aa385384(v=vs.85).aspx\n");
-	printf("How to programmatically query and set proxy settings under WinINet:\n");
-	printf("https://support.microsoft.com/en-us/help/226473/how-to-programmatically-query-and-set-proxy-settings-under-internet-ex\n");
-	printf("InternetQueryOption function https://msdn.microsoft.com/en-us/library/aa385101(v=vs.85).aspx\n");
-}
-
-INT __cdecl main(int argc, __in_ecount(argc) LPSTR  *argv)
-{
-	INT iReturn = -1;
-
-	SETPROXY_ACTION action = SHOW;
-	HRESULT hrCoInit = CoInitialize(NULL);
-
-
-	// this not getting called if the CoInit() fails won't be fatal
-	// g_pIStatus will still be NULL, so all the LogString() calls will 
-	// just skip over making the call into Piper for that portion of the logging
-	if (FAILED(hrCoInit))
-	{
-		exit(-1L);
-	}
-
-	TCHAR * pszBuffer = NULL;
-	if (argc == 1)
-	{
-		EnumConnections();
-		Usage();
-		return 0L;
-	}
-	if (argc >1)
-	{
-		// AutoconfigURL should be before Auto since first 4 letters are the same 
-		if (0 == _strnicmp("autoconfigURL", argv[1], 13))
-		{
-			// Adding the Action before if (argc >2) statement since user might specify blank as the autoconfig 
-			// Incase user specifies blank in Inetcpl.cpl then the connection is returned to Direct. We are simulating this behaviour			
-			action = AUTOCONFIG;
-			LogString("Setting AutoConfig url");
-			if (argc >2)
-			{
-				pszBuffer = argv[2];
-				if (argc > 3)
-				{
-					ConnectionName = argv[3];
-				}
-			}
-			else
-			{
-				pszBuffer = "";
-			}
-
-		}
-		else if (0 == _strnicmp("auto", argv[1], 4))
-		{
-			action = AUTO;
-			LogString("Setting Auto detect proxy settings.");
-			if (argc > 2)
-			{
-				ConnectionName = argv[2];
-			}
-		}
-		else if (0 == _strnicmp("manual", argv[1], 6))
-		{
-			action = MANUAL;
-			if (argc >2)
-			{
-				action = MANUALSERVER;
-				LogString("Setting Hardcoded proxy");
-				pszBuffer = argv[2];
-			}
-			if (argc > 3)
-			{
-				ConnectionName = argv[3];
-			}
-		}
-		else if (0 == _strnicmp("direct", argv[1], 6))
-		{
-			action = DIRECT;
-			LogString("Setting Direct Internet Access, proxy disabled.");
-			if (argc > 2)
-			{
-				ConnectionName = argv[2];
-			}
-		}
-		else if (0 == _strnicmp("bypass", argv[1], 6))
-		{
-			if (argc >2)
-			{
-				action = BYPASS;
-				LogString("Setting the Proxy Bypass addresses");
-				pszBuffer = argv[2];
-			}
-			if (argc > 3)
-			{
-				ConnectionName = argv[3];
-			}
-		}
-		else if (0 == _strnicmp("reset", argv[1], 5))
-		{
-			action = RESET;
-			LogString("Resetting the proxy settings");
-			if (argc > 2)
-			{
-				ConnectionName = argv[2];
-			}
-		}
-		else if (0 == _strnicmp("show", argv[1], 5))
-		{
-			action = SHOW;
-			if (argc > 2)
-			{
-				ConnectionName = argv[2];
-			}
-		}
-		else
-		{
-			if (argc > 1)
-			{
-				ConnectionName = argv[1];
-			}
-		}
-	}
-
-	if (ConnectionName != NULL)
-	{
-		LogString("Warning : if connection name  %s does not exits , it will be created with LAN Settings!\n", ConnectionName);
-		LogString("Warning if connection name contains non ASCII character (accentuated), the created entry will not be correct on Windows Creators Update\n");
-	}
-
-	switch (action)
-	{
-	case AUTO:
-		if (TRUE == ConfigureProxy(AUTO))
-		{
-			LogString("Successfully configured WinINet to use the Automatic Proxy detection.");
-			iReturn = 0;
-		}
-		else
-		{
-			LogString("Failed to configure the Automatic Proxy detection.");
-		}
-		break;
-	case RESET:
-		if (TRUE == ConfigureProxy(RESET))
-		{
-			LogString("Successfully reset of WinINet proxy settings (including removing DIRECT!)");
-			iReturn = 0;
-		}
-		else
-		{
-			LogString("Failed to reset WinINet proxy settings.");
-		}
-		break;
-	case MANUAL:
-		if (TRUE == ConfigureProxy(MANUAL))
-		{
-			LogString("Successfully configured WinINet to use Manual Proxy settings.");
-			iReturn = 0;
-		}
-		else
-		{
-			LogString("Failed to configure the Proxy settings to Manual.");
-		}
-		break;
-
-	case MANUALSERVER:
-		if (TRUE == ConfigureProxy(MANUAL))
-		{
-			if (TRUE == SetProxyServer(pszBuffer))
-			{
-				LogString("Successfully configured WinINet Manual Proxy server to %S.", pszBuffer);
-				iReturn = 0;
-			}
-			else
-			{
-				LogString("Failed to configure the Manual Proxy server using %S.", pszBuffer);
-			}
-		}
-		else
-		{
-			LogString("Failed to configure the Proxy settings to Manual.");
-		}
-		break;
-	case DIRECT:
-		if (TRUE == ConfigureProxy(DIRECT))
-		{
-			LogString("Successfully configured WinINet to use Direct Internet access. The Proxy setting have been turned off.");
-			iReturn = 0;
-		}
-		else
-		{
-			LogString("Failed to configure the Proxy setting for Direct Internet Access.");
-		}
-		break;
-	case BYPASS:
-		if (TRUE == SetProxyByPass(pszBuffer))
-		{
-			LogString("Successfully configured WinINet Proxy ByPass settings to %S.", pszBuffer);
-			iReturn = 0;
-		}
-		else
-		{
-			LogString("Failed to configure the Proxy ByPass settings.");
-		}
-		break;
-	case AUTOCONFIG:
-		if (TRUE == ConfigureProxy(AUTOCONFIG))
-		{
-
-			if (TRUE == SetProxyAutoConfig(pszBuffer))
-			{
-				LogString("Successfully configured WinINet AutoconfigURL to %S.", pszBuffer);
-				iReturn = 0;
-			}
-			else
-			{
-				LogString("Failed to configure IE to AutoconfigURL using %S.", pszBuffer);
-			}
-		}
-		else
-		{
-			LogString("Failed to configure the Proxy settings to Manual.");
-		}
-		break;
-	case SHOW:
-		if (ConnectionName != NULL)
-		{
-			LogString("Currrent proxy settings for Connection : %s\n", ConnectionName);
-		}
-		else
-		{
-			LogString("Currrent proxy settings for Lan Settings\n");
-		}
-		LogString("***********************\n");
-		GetProxySettings();
-		LogString("\n***********************\n");
-		return 0L;
-	default:
-		Usage();
-		return 0L;
-	}
-
-	if (ConnectionName != NULL)
-	{
-		LogString("New proxy settings for Connection : %s\n", ConnectionName);
-	}
-	else
-	{
-		LogString("New proxy settings for Lan Settings\n");
-	}
-	LogString("***********************\n");
-	GetProxySettings();
-	LogString("\n***********************\n");
-
-	if (SUCCEEDED(hrCoInit))
-	{
-		CoUninitialize();
-	}
-
-	return iReturn;
-
-}
