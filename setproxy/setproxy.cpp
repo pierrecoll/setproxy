@@ -14,7 +14,7 @@
 
 #pragma comment(lib, "wininet.lib")
 
-enum SETPROXY_ACTION
+enum class SETPROXY_ACTION
 {
 	AUTO,
 	DIRECT,
@@ -37,7 +37,6 @@ BOOL GetProxySettings();
 BOOL SetProxyServer(__in_opt TCHAR* pszHostPort);
 BOOL SetProxyByPass(__in_opt TCHAR* pszByPass);
 BOOL SetProxyAutoConfig(__in_opt TCHAR* pszAutoURL);
-
 
 
 void Usage()
@@ -67,7 +66,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 {
 	INT iReturn = -1;
 
-	SETPROXY_ACTION action = SHOW;
+	SETPROXY_ACTION action = SETPROXY_ACTION::SHOW;
 	HRESULT hrCoInit = CoInitialize(NULL);
 
 
@@ -93,7 +92,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 		{
 			// Adding the Action before if (argc >2) statement since user might specify blank as the autoconfig 
 			// Incase user specifies blank in Inetcpl.cpl then the connection is returned to Direct. We are simulating this behaviour			
-			action = AUTOCONFIG;
+			action = SETPROXY_ACTION::AUTOCONFIG;
 			LogString("Setting AutoConfig url");
 			if (argc > 2)
 			{
@@ -111,7 +110,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 		}
 		else if (0 == _strnicmp("auto", argv[1], 4))
 		{
-			action = AUTO;
+			action = SETPROXY_ACTION::AUTO;
 			LogString("Setting Auto detect proxy settings.");
 			if (argc > 2)
 			{
@@ -120,10 +119,10 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 		}
 		else if (0 == _strnicmp("manual", argv[1], 6))
 		{
-			action = MANUAL;
+			action = SETPROXY_ACTION::MANUAL;
 			if (argc > 2)
 			{
-				action = MANUALSERVER;
+				action = SETPROXY_ACTION::MANUALSERVER;
 				LogString("Setting Hardcoded proxy");
 				pszBuffer = argv[2];
 			}
@@ -134,7 +133,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 		}
 		else if (0 == _strnicmp("direct", argv[1], 6))
 		{
-			action = DIRECT;
+			action = SETPROXY_ACTION::DIRECT;
 			LogString("Setting Direct Internet Access, proxy disabled.");
 			if (argc > 2)
 			{
@@ -145,7 +144,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 		{
 			if (argc > 2)
 			{
-				action = BYPASS;
+				action = SETPROXY_ACTION::BYPASS;
 				LogString("Setting the Proxy Bypass addresses");
 				pszBuffer = argv[2];
 			}
@@ -156,7 +155,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 		}
 		else if (0 == _strnicmp("reset", argv[1], 5))
 		{
-			action = RESET;
+			action = SETPROXY_ACTION::RESET;
 			LogString("Resetting the proxy settings");
 			if (argc > 2)
 			{
@@ -165,7 +164,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 		}
 		else if (0 == _strnicmp("show", argv[1], 5))
 		{
-			action = SHOW;
+			action = SETPROXY_ACTION::SHOW;
 			if (argc > 2)
 			{
 				ConnectionName = argv[2];
@@ -188,8 +187,8 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 
 	switch (action)
 	{
-	case AUTO:
-		if (TRUE == ConfigureProxy(AUTO))
+	case SETPROXY_ACTION::AUTO:
+		if (TRUE == ConfigureProxy(SETPROXY_ACTION::AUTO))
 		{
 			LogString("Successfully configured WinINet to use the Automatic Proxy detection.");
 			iReturn = 0;
@@ -199,8 +198,8 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 			LogString("Failed to configure the Automatic Proxy detection.");
 		}
 		break;
-	case RESET:
-		if (TRUE == ConfigureProxy(RESET))
+	case SETPROXY_ACTION::RESET:
+		if (TRUE == ConfigureProxy(SETPROXY_ACTION::RESET))
 		{
 			LogString("Successfully reset of WinINet proxy settings (including removing DIRECT!)");
 			iReturn = 0;
@@ -210,8 +209,8 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 			LogString("Failed to reset WinINet proxy settings.");
 		}
 		break;
-	case MANUAL:
-		if (TRUE == ConfigureProxy(MANUAL))
+	case SETPROXY_ACTION::MANUAL:
+		if (TRUE == ConfigureProxy(SETPROXY_ACTION::MANUAL))
 		{
 			LogString("Successfully configured WinINet to use Manual Proxy settings.");
 			iReturn = 0;
@@ -222,8 +221,8 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 		}
 		break;
 
-	case MANUALSERVER:
-		if (TRUE == ConfigureProxy(MANUAL))
+	case SETPROXY_ACTION::MANUALSERVER:
+		if (TRUE == ConfigureProxy(SETPROXY_ACTION::MANUAL))
 		{
 			if (TRUE == SetProxyServer(pszBuffer))
 			{
@@ -240,8 +239,8 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 			LogString("Failed to configure the Proxy settings to Manual.");
 		}
 		break;
-	case DIRECT:
-		if (TRUE == ConfigureProxy(DIRECT))
+	case SETPROXY_ACTION::DIRECT:
+		if (TRUE == ConfigureProxy(SETPROXY_ACTION::DIRECT))
 		{
 			LogString("Successfully configured WinINet to use Direct Internet access. The Proxy setting have been turned off.");
 			iReturn = 0;
@@ -251,7 +250,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 			LogString("Failed to configure the Proxy setting for Direct Internet Access.");
 		}
 		break;
-	case BYPASS:
+	case SETPROXY_ACTION::BYPASS:
 		if (TRUE == SetProxyByPass(pszBuffer))
 		{
 			LogString("Successfully configured WinINet Proxy ByPass settings to %S.", pszBuffer);
@@ -262,8 +261,8 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 			LogString("Failed to configure the Proxy ByPass settings.");
 		}
 		break;
-	case AUTOCONFIG:
-		if (TRUE == ConfigureProxy(AUTOCONFIG))
+	case SETPROXY_ACTION::AUTOCONFIG:
+		if (TRUE == ConfigureProxy(SETPROXY_ACTION::AUTOCONFIG))
 		{
 
 			if (TRUE == SetProxyAutoConfig(pszBuffer))
@@ -281,7 +280,7 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 			LogString("Failed to configure the Proxy settings to Manual.");
 		}
 		break;
-	case SHOW:
+	case SETPROXY_ACTION::SHOW:
 		if (ConnectionName != NULL)
 		{
 			LogString("Currrent proxy settings for Connection : %s\n", ConnectionName);
@@ -712,7 +711,7 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 		//Should be in the retrieved option
 		//Option[1].Value.dwValue = PROXY_TYPE_DIRECT;
 		//LogString("Option:INTERNET_PER_CONN_FLAGS Value:PROXY_TYPE_DIRECT");
-		if (AUTO == action)
+		if (SETPROXY_ACTION::AUTO == action)
 		{
 			Option[0].Value.dwValue |= PROXY_TYPE_AUTO_DETECT;
 			LogString("INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_AUTO_DETECT");
@@ -723,24 +722,24 @@ BOOL ConfigureProxy(SETPROXY_ACTION action)
 		{
 			Option[1].Value.dwValue &= ~AUTO_PROXY_FLAG_DETECTION_RUN;
 			LogString("INTERNET_PER_CONN_AUTODISCOVERY_FLAGS Value &= ~AUTO_PROXY_FLAG_DETECTION_RUN");
-			if (MANUAL == action)
+			if (SETPROXY_ACTION::MANUAL == action)
 			{
 				Option[0].Value.dwValue |= PROXY_TYPE_PROXY;
 				LogString("INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_PROXY");
 			}
-			else if (AUTOCONFIG == action)
+			else if (SETPROXY_ACTION::AUTOCONFIG == action)
 			{
 				Option[0].Value.dwValue |= PROXY_TYPE_AUTO_PROXY_URL;
 				LogString("INTERNET_PER_CONN_FLAGS Value |= PROXY_TYPE_AUTO_PROXY_URL");
 			}
-			else if (action == RESET)
+			else if (action == SETPROXY_ACTION::RESET)
 			{
 				Option[0].Value.dwValue = 0;
 				LogString("INTERNET_PER_CONN_FLAGS Value set to zero");
 				Option[1].Value.dwValue &= ~AUTO_PROXY_FLAG_USER_SET;
 				LogString("INTERNET_PER_CONN_AUTODISCOVERY_FLAGS Value &= ~AUTO_PROXY_FLAG_USER_SET");
 			}
-			else if (action == DIRECT)
+			else if (action == SETPROXY_ACTION::DIRECT)
 			{
 				Option[0].Value.dwValue |= PROXY_TYPE_DIRECT;
 				LogString("INTERNET_PER_CONN_FLAGS |= PROXY_TYPE_DIRECT");
