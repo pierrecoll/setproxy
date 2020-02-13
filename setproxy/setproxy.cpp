@@ -45,6 +45,7 @@ void Usage()
 	printf("SetProxy.exe usage|reset|autoconfigURL|auto|direct|manual|manual HOST:PORT[;https=HOST:PORT][;ftp=HOST:PORT]|bypass <bypass ports> [ConnectionName]\n");
 	printf("Running setproxy with no parameters displays help and connections\n");
 	printf("Connection name is optional. By default, setproxy will use the Local Area Network (LAN) Settings connection\n");
+	printf("connections    --  shows the Connections.\n");
 	printf("show    --  shows current configuration for connection.\n");
 	printf("reset   --  Resets proxy settings (DIRECT included).\n");
 	printf("autoconfigURL http://proxy/autoconfig.pac \n");
@@ -60,6 +61,9 @@ void Usage()
 	printf("How to programmatically query and set proxy settings under WinINet:\n");
 	printf("https://support.microsoft.com/en-us/help/226473/how-to-programmatically-query-and-set-proxy-settings-under-internet-ex\n");
 	printf("InternetQueryOption function https://msdn.microsoft.com/en-us/library/aa385101(v=vs.85).aspx\n");
+	printf("You can use psexec (http://live.sysinternals.com) -s to run setproxy using the System (S-1-5-18) account: psexec -s c:\\tools\\setproxy.exe show\n");
+	printf("You can use psexec -u \"NT AUTHORITY\\LOCALSERVICE\" to run setproxy using the Local Service (S-1-5-19) account\n");
+	printf("You can use psexec -u \"NT AUTHORITY\\NETWORKSERVICE\" to run setproxy using the Network Service  (S-1-5-20) account\n");
 }
 
 INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
@@ -81,7 +85,6 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 	TCHAR* pszBuffer = NULL;
 	if (argc == 1)
 	{
-		EnumConnections();
 		Usage();
 		return 0L;
 	}
@@ -116,6 +119,11 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 			{
 				ConnectionName = argv[2];
 			}
+		}
+		else if (0 == _strnicmp("connections", argv[1], 4))
+		{
+			EnumConnections();
+			exit(1L);
 		}
 		else if (0 == _strnicmp("manual", argv[1], 6))
 		{
@@ -172,10 +180,8 @@ INT __cdecl main(int argc, __in_ecount(argc) LPSTR* argv)
 		}
 		else
 		{
-			if (argc > 1)
-			{
-				ConnectionName = argv[1];
-			}
+			Usage();
+			exit(0L);
 		}
 	}
 
